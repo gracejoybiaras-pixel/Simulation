@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Math Quiz Battle</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #5f9cff, #7b5cff);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* CONTAINER */
+.game-container {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  width: 340px;
+  padding: 25px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  text-align: center;
+  color: white;
+  transition: 0.3s;
+}
+
+/* TITLE */
+h1 {
+  margin-bottom: 10px;
+  font-size: 22px;
+}
+
+/* QUESTION */
+#question {
+  background: rgba(255,255,255,0.15);
+  padding: 18px;
+  border-radius: 14px;
+  font-size: 22px;
+  margin: 20px 0;
+}
+
+/* TIMER BAR */
+.timer-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+#timer-progress {
+  height: 100%;
+  width: 100%;
+  background: #00e0ff;
+  box-shadow: 0 0 10px #00e0ff;
+  transition: width 1s linear;
+}
+
+/* ANSWERS */
+#answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+#answers button {
+  background: white;
+  color: #333;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+#answers button:hover {
+  transform: scale(1.05);
+  background: #ffe066;
+}
+
+/* POWERUPS */
+.powerups {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.powerups button {
+  flex: 1;
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.powerups button:hover {
+  background: #ff3b3b;
+}
+
+/* NEXT BUTTON */
+.next-btn {
+  margin-top: 15px;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #00c9a7, #00e0ff);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.next-btn:hover {
+  transform: scale(1.03);
+}
+
+/* SCOREBOARD */
+#scoreboard {
+  margin-top: 15px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="game-container">
+  <h1>⚔️ Math Battle</h1>
+
+  <div class="timer-bar">
+    <div id="timer-progress"></div>
+  </div>
+
+  <div id="question">Loading...</div>
+
+  <div id="answers"></div>
+
+  <div class="powerups">
+    <button onclick="useDouble()">💥 Double</button>
+    <button onclick="useSkip()">⏭ Skip</button>
+  </div>
+
+  <button class="next-btn" onclick="nextQuestion()">Next ➡️</button>
+
+  <div id="scoreboard">Level 1 (Easy) | Player: 0 | AI: 0</div>
+</div>
+
+<script>
+// ----- SOUNDS -----
+const correctSound = new Audio("https://www.soundjay.com/buttons/sounds/button-3.mp3");
+const wrongSound = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
+const timeUpSound = new Audio("https://www.soundjay.com/buttons/sounds/button-4.mp3");
+const levelUpSound = new Audio("https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3");
+
+// ----- VARIABLES -----
+let playerScore = 0;
+let aiScore = 0;
+let doubleActive = false;
+let currentAnswer = null;
+let timer;
+let timeLeft = 10;
+
+let level = 1;
+let questionCount = 0;
+let maxQuestions = 5;
+
+const passScore = {1:3, 2:4, 3:5};
+
+// ----- LEVEL NAME -----
+function getLevelName(){
+  if(level===1) return "Easy";
+  if(level===2) return "Medium";
+  return "Hard";
+}
+
+// ----- GENERATE QUESTION -----
+function generateQuestion(){
+  let a,b,op,answer;
+
+  if(level===1){
+    a = Math.floor(Math.random()*10+1);
+    b = Math.floor(Math.random()*10+1);
+    op = ["+","-"][Math.floor(Math.random()*2)];
+  } 
+  else if(level===2){
+    a = Math.floor(Math.random()*20+1);
+    b = Math.floor(Math.random()*20+1);
+    op = ["+","-","*"][Math.floor(Math.random()*3)];
+  } 
+  else {
+    a = Math.floor(Math.random()*50+1);
+    b = Math.floor(Math.random()*50+1);
+    op = ["+","-","*"][Math.floor(Math.random()*3)];
+  }
+
+  if(op==="+") answer = a+b;
+  else if(op==="-") answer = a-b;
+  else answer = a*b;
+
+  currentAnswer = answer;
+  return `${a} ${op} ${b} = ?`;
+}
+
+// ----- DISPLAY QUESTION -----
+function displayQuestion(){
+  clearInterval(timer);
+  timeLeft = 10;
+
+  const progressBar = document.getElementById("timer-progress");
+  progressBar.style.width = "100%";
+  progressBar.style.background = "#00e0ff";
+
+  // LEVEL COLOR BORDER
+  const container = document.querySelector(".game-container");
+  if(level === 1) container.style.border = "2px solid #00ff9f";
+  else if(level === 2) container.style.border = "2px solid #ffd166";
+  else container.style.border = "2px solid #ff4d4d";
+
+  document.getElementById("answers").innerHTML = "";
+  document.getElementById("question").innerText = generateQuestion();
+
+  timer = setInterval(()=>{
+    timeLeft--;
+
+    let percentage = (timeLeft / 10) * 100;
+    progressBar.style.width = percentage + "%";
+
+    if(timeLeft <= 3){
+      progressBar.style.background = "#ff4d4d";
+    }
+
+    if(timeLeft <= 0){
+      clearInterval(timer);
+      timeUpSound.play();
+      alert("⏰ Time's up!");
+      nextQuestion();
+    }
+  },1000);
+
+  let correctPos = Math.floor(Math.random()*4);
+
+  for(let i=0;i<4;i++){
+    let btn = document.createElement("button");
+
+    if(i===correctPos) btn.innerText = currentAnswer;
+    else btn.innerText = currentAnswer + Math.floor(Math.random()*5+1);
+
+    btn.onclick = ()=>checkAnswer(Number(btn.innerText));
+    document.getElementById("answers").appendChild(btn);
+  }
+}
+
+// ----- CHECK ANSWER -----
+function checkAnswer(ans){
+  clearInterval(timer);
+
+  let points = doubleActive ? 2 : 1;
+  doubleActive = false;
+
+  if(ans===currentAnswer){
+    playerScore += points;
+    correctSound.play();
+  } else {
+    wrongSound.play();
+  }
+
+  if(Math.random()<0.5) aiScore++;
+
+  updateScore();
+  nextQuestion();
+}
+
+// ----- NEXT QUESTION -----
+function nextQuestion(){
+  questionCount++;
+
+  if(questionCount>=maxQuestions){
+    if(playerScore >= passScore[level]){
+      if(level<3){
+        levelUpSound.play();
+        alert("🎉 Level Passed!");
+        level++;
+        resetLevel();
+      } else {
+        levelUpSound.play();
+        alert("🏆 You Win!");
+      }
+    } else {
+      wrongSound.play();
+      alert("💔 Try Again!");
+      resetLevel();
+    }
+  } else {
+    displayQuestion();
+  }
+}
+
+// ----- RESET -----
+function resetLevel(){
+  playerScore=0;
+  aiScore=0;
+  questionCount=0;
+  updateScore();
+  displayQuestion();
+}
+
+// ----- SCORE -----
+function updateScore(){
+  document.getElementById("scoreboard").innerText =
+    `Level ${level} (${getLevelName()}) | Player: ${playerScore} | AI: ${aiScore}`;
+}
+
+// ----- POWERUPS -----
+function useDouble(){
+  doubleActive = true;
+}
+
+function useSkip(){
+  nextQuestion();
+}
+
+// ----- START -----
+displayQuestion();
+</script>
+
+</body>
+</html>
